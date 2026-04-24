@@ -1,0 +1,26 @@
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+      # Uncomment to enable container actions (stop, start, restart)
+      # - DOZZLE_ENABLE_ACTIONS=true
+      # Uncomment to allow access to container shells
+      # - DOZZLE_ENABLE_SHELL=true
+      # Uncomment to enable authentication
+      # - DOZZLE_AUTH_PROVIDER=simple
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`${DOZZLE_HOST}`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls.certresolver=cfresolver
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
+    networks:
+      - traefik-net
+networks:
+  traefik-net:
+    external: true

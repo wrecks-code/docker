@@ -1,0 +1,36 @@
+networks:
+  traefik-net:
+    external: true
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    ports:
+      - 5001:5001  # <--- DAS HIER FEHLT
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/docker/appdata/dockge/data:/app/data
+      - /opt/docker/stacks:/opt/stacks
+    environment:
+      - TZ=Europe/Berlin
+      - DOCKGE_STACKS_DIR=/opt/stacks
+      - DOCKGE_ENABLE_CONSOLE=true
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:5001
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dockge.rule=Host(`${DOCKGE_HOST}`) # your host
+      - traefik.http.routers.dockge.entrypoints=websecure
+      - traefik.http.routers.dockge.tls=true
+      - traefik.http.routers.dockge.tls.options=nohttp2@file
+      - traefik.http.services.dockge.loadbalancer.server.port=5001

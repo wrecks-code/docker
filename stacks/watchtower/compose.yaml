@@ -1,0 +1,46 @@
+services:
+  watchtower:
+    container_name: watchtower
+    hostname: thinkcentre
+    image: nickfedor/watchtower:latest
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: Europe/Berlin
+      WATCHTOWER_UPDATE_ON_START: "true"
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true" # suppress startup ping
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: 0 0 5 * * * # 05:00 daily (with seconds)
+      WATCHTOWER_INCLUDE_STOPPED: "true"
+      WATCHTOWER_NOTIFICATION_REPORT: "true" # use session report as template input
+      WATCHTOWER_NOTIFICATIONS_LEVEL: info # default; OK for report mode
+      WATCHTOWER_HTTP_API_METRICS: "true"
+      WATCHTOWER_HTTP_API_TOKEN: CHANGEME
+      WATCHTOWER_NOTIFICATION_URL: |
+        ntfy://ntfy/watchtower?scheme=http
+      WATCHTOWER_NOTIFICATION_TEMPLATE: >
+        {{- with .Report -}}
+          {{- if (or .Updated .Failed) -}}
+        {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+            {{- range .Updated}}
+        - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+            {{- end}}
+            {{- range .Failed}}
+        - {{.Name}} ({{.ImageName}}): Failed: {{.Error}}
+            {{- end}}
+          {{- else -}}
+        Everything is up to date
+          {{- end -}}
+        {{- end -}}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.watchtower.rule=Host(`watchtower.home.lan`)
+      - traefik.http.routers.watchtower.entrypoints=websecure
+      - traefik.http.services.watchtower.loadbalancer.server.port=8080
+networks:
+  traefik-net:
+    external: true

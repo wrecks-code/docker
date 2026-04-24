@@ -1,0 +1,25 @@
+networks:
+  traefik-net:
+    external: true
+services:
+  dockpeek:
+    image: ghcr.io/dockpeek/dockpeek:latest
+    container_name: dockpeek
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file:
+      - .env
+    labels:
+      - traefik.enable=true
+      # HTTP
+      - traefik.http.routers.dockpeek-http.rule=Host(`${DOCKPEEK_HOST}`)
+      - traefik.http.routers.dockpeek-http.entrypoints=web
+      # HTTPS
+      - traefik.http.routers.dockpeek-https.rule=Host(`${DOCKPEEK_HOST}`)
+      - traefik.http.routers.dockpeek-https.entrypoints=websecure
+      - traefik.http.routers.dockpeek-https.tls=true
+      # shared service (set only if the image doesn't EXPOSE the right port)
+      - traefik.http.services.dockpeek.loadbalancer.server.port=8000

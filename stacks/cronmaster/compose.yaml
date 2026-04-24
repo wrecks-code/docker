@@ -1,0 +1,46 @@
+services:
+  cronmaster:
+    image: ghcr.io/fccview/cronmaster:latest
+    container_name: cronmaster
+    restart: unless-stopped
+    user: "root"
+    privileged: true
+    pid: "host"
+    init: true
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DOCKER=true
+      - NEXT_PUBLIC_CLOCK_UPDATE_INTERVAL=30000
+      - AUTH_PASSWORD=${CRONMASTER_PASSWORD}
+      - HOST_CRONTAB_USER=root
+      - APP_URL=http://cronmaster:3000 
+    networks:
+      - traefik-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/docker/scripts:/app/scripts
+      - /opt/docker/appdata/cronmaster/data:/app/data
+      - /opt/docker/appdata/cronmaster/snippets:/app/snippets
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      # Backend Definition
+      - traefik.http.services.cronmaster.loadbalancer.server.port=3000
+      # 1. Router für Lokales Netz (websecure + TLS)
+      - traefik.http.routers.cronmaster-local.rule=Host(`${CRONMASTER_HOST}`)
+      - traefik.http.routers.cronmaster-local.entrypoints=websecure
+      - traefik.http.routers.cronmaster-local.tls=true
+      - traefik.http.routers.cronmaster-local.service=cronmaster
+
+      - homepage.group=${GRP_AUT}
+      - homepage.name=Cronmaster
+      - homepage.icon=cronmaster
+      - homepage.href=https://${CRONMASTER_HOST}
+      - homepage.description=Cronjob management UI with human readable syntax, live logging and log history for your cronjobs
+      - homepage.siteMonitor=https://${CRONMASTER_HOST}
+
+networks:
+  traefik-net:
+    external: true
