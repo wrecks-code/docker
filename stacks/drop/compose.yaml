@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: drop-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_PASSWORD: ${DROP_POSTGRES_PASSWORD}
+      POSTGRES_USER: ${DROP_POSTGRES_USER}
+      POSTGRES_DB: ${DROP_POSTGRES_DB}
+    volumes:
+      - /opt/docker/appdata/drop/drop-postgres/data:/var/lib/postgresql/data
+    networks:
+      - drop-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${DROP_POSTGRES_DB} -U ${DROP_POSTGRES_USER}"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 10s
+
+  drop:
+    image: ghcr.io/drop-oss/drop:latest
+    container_name: drop
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DROP_DATABASE_URL}
+      EXTERNAL_URL: ${DROP_EXTERNAL_URL}
+
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET}
+      DISABLE_SIMPLE_AUTH: ${DISABLE_SIMPLE_AUTH}
+
+    volumes:
+      - /mnt/usb-hdd/docker/data/drop:/library
+      - /opt/docker/appdata/drop/drop/data:/data
+    networks:
+      - traefik-net
+      - drop-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.drop.rule=Host(`${DROP_HOST}`)
+      - traefik.http.routers.drop.entrypoints=web,websecure
+      - traefik.http.services.drop.loadbalancer.server.port=3000
+
+      - homepage.group=${GRP_PERS}
+      - homepage.name=Drop
+      - homepage.icon=drop
+      - homepage.href=https://${DROP_HOST}
+      - homepage.siteMonitor=https://${DROP_HOST}
+      - homepage.description=Drop is an open-source game distribution platform. 
+
+networks:
+  traefik-net:
+    external: true
+  drop-net:
+    external: true

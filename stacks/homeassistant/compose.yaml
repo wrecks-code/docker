@@ -1,0 +1,31 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: homeassistant/home-assistant:latest
+    dns: 192.168.0.3
+    volumes:
+      - /opt/docker/appdata/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fs http://localhost:8123/ || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - homepage.group=${GRP_AUT}
+      - homepage.name=Home Assistant
+      - homepage.icon=home-assistant
+      - homepage.href=https://assistant.home.lan
+      - homepage.description=Open source home automation that puts local control and privacy first. Powered by a worldwide community of tinkerers and DIY enthusiasts.
+      - homepage.siteMonitor=https://hass.speedpoop.com
+      - homepage.widget.type=homeassistant
+      - homepage.widget.url=http://192.168.0.3:8123
+      - homepage.widget.key=${HOMEASSISTANT_KEY}
+networks: {}

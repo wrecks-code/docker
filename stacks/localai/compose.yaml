@@ -1,0 +1,54 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      - /opt/docker/appdata/ollama:/root/.ollama
+    networks:
+      - ollama-net
+    labels:
+      - homepage.group=${GRP_AI}
+      - homepage.name=Ollama
+      - homepage.icon=ollama-dark
+      - homepage.description=Get up and running with Kimi-K2.5, GLM-5, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models. 
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: open-webui
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY}
+    volumes:
+      - /opt/docker/appdata/open-webui:/app/backend/data
+    networks:
+      - traefik-net
+      - ollama-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.ollama.rule=Host(`${OPENWEBUI_HOST}`)
+      - traefik.http.routers.ollama.entrypoints=web,websecure
+      - traefik.http.services.ollama.loadbalancer.server.port=8080
+
+      - homepage.group=${GRP_AI}
+      - homepage.name=Open WebUI
+      - homepage.icon=open-webui
+      - homepage.href=https://${OPENWEBUI_HOST}
+      - homepage.siteMonitor=https://${OPENWEBUI_HOST}
+      - homepage.description=User-friendly AI Interface (Supports Ollama, OpenAI API, ...) 
+
+networks:
+  traefik-net:
+    external: true
+  ollama-net:
+    external: true

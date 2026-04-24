@@ -1,0 +1,35 @@
+networks:
+  traefik-net:
+    external: true
+
+services:
+  zerobyte:
+    image: ghcr.io/nicotsx/zerobyte:v0.22.0
+    container_name: zerobyte
+    restart: unless-stopped
+    devices:
+      - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    networks:
+      - traefik-net
+    env_file:
+      - .env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /opt/docker/appdata/zerobyte/data:/var/lib/zerobyte
+      - /mnt/usb-hdd/docker/backup:/dockerbackup
+      - /home/wreck/.config/rclone:/root/.config/rclone
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.zerobyte.rule=Host(`${ZEROBYTE_HOST}`)
+      - traefik.http.routers.zerobyte.entrypoints=websecure
+      - traefik.http.services.zerobyte.loadbalancer.server.port=4096
+
+      - homepage.group=Management
+      - homepage.name=Zerobyte
+      - homepage.icon=sh-zerobyte
+      - homepage.href=https://${ZEROBYTE_HOST}
+      - homepage.description=Self-hosted manga/comic reader
+      - homepage.siteMonitor=https://${ZEROBYTE_HOST}

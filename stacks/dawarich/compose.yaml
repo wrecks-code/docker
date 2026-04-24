@@ -1,0 +1,173 @@
+networks:
+  dawarich-net:
+    external: true
+  traefik-net:
+    external: true
+
+services:
+  dawarich-redis:
+    image: redis:7.4-alpine
+    container_name: dawarich-redis
+    restart: unless-stopped
+    networks:
+      - dawarich-net
+    command: redis-server
+    volumes:
+      - /opt/docker/appdata/dawarich/redis:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - --raw
+        - incr
+        - ping
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=false
+
+  dawarich-db:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: dawarich-db
+    restart: unless-stopped
+    shm_size: 1G
+    networks:
+      - dawarich-net
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-dawarich-development}
+    volumes:
+      - /opt/docker/appdata/dawarich/db:/var/lib/postgresql/data
+      - /opt/docker/appdata/dawarich/shared:/var/shared
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dawarich-development}
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=false
+
+  dawarich-app:
+    image: freikin/dawarich:latest
+    container_name: dawarich-app
+    restart: unless-stopped
+    networks:
+      - dawarich-net
+      - traefik-net
+    env_file:
+      - .env
+    environment:
+      - RAILS_ENV=${RAILS_ENV:-development}
+      - REDIS_URL=${REDIS_URL:-redis://dawarich-redis:6379}
+      - DATABASE_HOST=${DATABASE_HOST:-dawarich-db}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      - DATABASE_NAME=${DATABASE_NAME:-dawarich-development}
+      - MIN_MINUTES_SPENT_IN_CITY=${MIN_MINUTES_SPENT_IN_CITY:-60}
+      - APPLICATION_HOSTS=${APPLICATION_HOSTS:-localhost,::1,127.0.0.1}
+      - TIME_ZONE=${TIME_ZONE:-Europe/Berlin}
+      - APPLICATION_PROTOCOL=${APPLICATION_PROTOCOL:-http}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-CHANGE_ME}
+      - RAILS_LOG_TO_STDOUT=${RAILS_LOG_TO_STDOUT:-true}
+      - SELF_HOSTED=${SELF_HOSTED:-true}
+      - STORE_GEODATA=${STORE_GEODATA:-true}
+    stdin_open: true
+    tty: true
+    entrypoint: web-entrypoint.sh
+    command:
+      - bin/rails
+      - server
+      - -p
+      - "3000"
+      - -b
+      - "::"
+    volumes:
+      - /opt/docker/appdata/dawarich/public:/var/app/public
+      - /opt/docker/appdata/dawarich/watched:/var/app/tmp/imports/watched
+      - /opt/docker/appdata/dawarich/storage:/var/app/storage
+      - /opt/docker/appdata/dawarich/db:/dawarich_db_data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO - http://127.0.0.1:3000/api/v1/health | grep -q '"status"\s*:\s*"ok"'
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      dawarich-db:
+        condition: service_healthy
+      dawarich-redis:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.dawarich.rule=Host(`${DAWARICH_HOST}`)
+      - traefik.http.routers.dawarich.entrypoints=web,websecure
+      - traefik.http.services.dawarich.loadbalancer.server.port=3000
+
+      - homepage.group=${GRP_PERS}
+      - homepage.name=Dawarich
+      - homepage.icon=dawarich
+      - homepage.href=https://${DAWARICH_HOST}
+      - homepage.description=Your favorite self-hostable alternative to Google Timeline (Google Location History) 
+      - homepage.siteMonitor=https://${DAWARICH_HOST}
+
+  dawarich-sidekiq:
+    image: freikin/dawarich:latest
+    container_name: dawarich-sidekiq
+    restart: unless-stopped
+    networks:
+      - dawarich-net
+    env_file:
+      - .env
+    environment:
+      - RAILS_ENV=${RAILS_ENV:-development}
+      - REDIS_URL=${REDIS_URL:-redis://dawarich-redis:6379}
+      - DATABASE_HOST=${DATABASE_HOST:-dawarich-db}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      - DATABASE_NAME=${DATABASE_NAME:-dawarich-development}
+      - APPLICATION_HOSTS=${APPLICATION_HOSTS:-localhost,::1,127.0.0.1}
+      - BACKGROUND_PROCESSING_CONCURRENCY=${BACKGROUND_PROCESSING_CONCURRENCY:-10}
+      - APPLICATION_PROTOCOL=${APPLICATION_PROTOCOL:-http}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-CHANGE_ME}
+      - RAILS_LOG_TO_STDOUT=${RAILS_LOG_TO_STDOUT:-true}
+      - SELF_HOSTED=${SELF_HOSTED:-true}
+      - STORE_GEODATA=${STORE_GEODATA:-true}
+    stdin_open: true
+    tty: true
+    entrypoint: sidekiq-entrypoint.sh
+    command:
+      - sidekiq
+    volumes:
+      - /opt/docker/appdata/dawarich/public:/var/app/public
+      - /opt/docker/appdata/dawarich/watched:/var/app/tmp/imports/watched
+      - /opt/docker/appdata/dawarich/storage:/var/app/storage
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pgrep -f sidekiq
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      dawarich-db:
+        condition: service_healthy
+      dawarich-redis:
+        condition: service_healthy
+      dawarich-app:
+        condition: service_healthy
+    labels:
+      - traefik.enable=false

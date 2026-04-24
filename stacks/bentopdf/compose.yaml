@@ -1,0 +1,24 @@
+services:
+  bentopdf:
+    image: ghcr.io/alam00000/bentopdf-simple:latest
+    container_name: bentopdf
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.bentopdf.rule=Host(`${BENTOPDF_HOST}`)
+      - traefik.http.routers.bentopdf.entrypoints=web,websecure
+      - traefik.http.services.bentopdf.loadbalancer.server.port=8080
+
+      - homepage.group=${GRP_DOCS}
+      - homepage.name=BentoPDF
+      - homepage.icon=bentopdf
+      - homepage.href=https://${BENTOPDF_HOST}
+      - homepage.siteMonitor=https://${BENTOPDF_HOST}
+      - homepage.description=A Privacy First PDF Toolkit 
+
+networks:
+  traefik-net:
+    external: true
