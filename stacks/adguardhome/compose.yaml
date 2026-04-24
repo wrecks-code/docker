@@ -1,0 +1,31 @@
+services:
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    volumes:
+      - /opt/docker/appdata/adguardhome/work:/opt/adguardhome/work
+      - /opt/docker/appdata/adguardhome/conf:/opt/adguardhome/conf
+    environment:
+      - TZ=Europe/Berlin
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adguard.rule=Host(`${ADGUARDHOME_HOST}`)
+      - traefik.http.routers.adguard.entrypoints=websecure
+      - traefik.http.services.adguard.loadbalancer.server.port=3000
+
+      - homepage.group=${GRP_NET}
+      - homepage.name=AdGuard Home
+      - homepage.icon=adguard-home
+      - homepage.href=https://${ADGUARDHOME_HOST}
+      - homepage.description=Network-wide ads & trackers blocking DNS server + DHCP
+      - homepage.siteMonitor=https://${ADGUARDHOME_HOST}
+      - homepage.widget.type=adguard
+      - homepage.widget.url=http://192.168.0.3:3000
+      - homepage.widget.username=${ADGUARD_USER}
+      - homepage.widget.password=${ADGUARD_PASSWORD}
+
+
+networks: {}

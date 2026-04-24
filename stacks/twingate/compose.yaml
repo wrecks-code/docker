@@ -1,0 +1,23 @@
+services:
+  twingate:
+    image: twingate/connector:latest
+    container_name: twingate-connector
+    restart: unless-stopped
+    pull_policy: always
+    # connector requires host network for local DNS/resource access
+    network_mode: host
+    environment:
+      - TWINGATE_NETWORK=speedpoop
+      - TWINGATE_ACCESS_TOKEN=CHANGEME
+      - TWINGATE_REFRESH_TOKEN=CHANGEME
+      - TWINGATE_DNS=192.168.0.3
+      - TWINGATE_LABEL_HOSTNAME=thinkcentre
+      - TWINGATE_LABEL_DEPLOYED_BY=docker
+
+    labels:
+      - homepage.group=${GRP_NET}
+      - homepage.name=Twingate
+      - homepage.icon=https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/twingate-light.svg
+      - homepage.description=Connector
+
+networks: {}

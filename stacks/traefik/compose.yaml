@@ -1,0 +1,65 @@
+networks:
+  traefik-net:
+    name: traefik-net
+    driver: bridge
+services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --ping=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --api.dashboard=true
+      - --accesslog=true
+      - --entrypoints.websecure.http3=true
+      - --api.insecure=true
+      # - --entrypoints.internal.address=:8080
+      # Längere Timeouts für große Uploads
+      - --entrypoints.web.transport.respondingTimeouts.readTimeout=600s
+      - --entrypoints.web.transport.respondingTimeouts.writeTimeout=600s
+      - --entrypoints.web.transport.respondingTimeouts.idleTimeout=600s
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s
+      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s
+      - --entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ${DOCKER_SOCK}:/var/run/docker.sock:ro
+      - ${DATA_ROOT}/dynamic:/etc/traefik/dynamic:ro
+      - ${DATA_ROOT}/certs:/certs:ro
+      - ${DATA_ROOT}/auth:/auth:ro
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST}`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=auth
+      - traefik.http.middlewares.auth.basicauth.usersfile=/auth/htpasswd
+
+      - homepage.group=${GRP_NET}
+      - homepage.name=Traefik
+      - homepage.icon=traefik
+      - homepage.href=https://${TRAEFIK_HOST}
+      - homepage.description=The Cloud Native Application Proxy
+      - homepage.widget.type=traefik
+      - homepage.widget.url=http://traefik:8080
+      - homepage.widget.username=${TRAEFIK_USER}
+      - homepage.widget.password=${TRAEFIK_PASSWORD}
+      - homepage.ping=http://traefik:8080/ping
+
+      - homepage.server=thinkcentre-docker
+      - homepage.container=traefik
+
+    networks:
+      - traefik-net

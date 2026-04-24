@@ -1,0 +1,16 @@
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    hostname: pihole
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - /usb-ssd/docker/appdata/pihole/pihole:/etc/pihole
+      - /usb-ssd/docker/appdata/pihole/dnsmasqd:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+      - SYS_TIME
+    restart: unless-stopped
+networks: {}

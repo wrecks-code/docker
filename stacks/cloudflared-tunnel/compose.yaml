@@ -1,0 +1,23 @@
+networks:
+  cftunnel-net:
+    name: cftunnel-net
+    driver: bridge
+  traefik-net:
+    external: true
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    labels:
+      - homepage.group=${GRP_NET}
+      - homepage.name=Cloudflared
+      - homepage.icon=si-cloudflare
+      - homepage.description=Tunnel
+      - homepage.widget.type=cloudflared
+      - homepage.widget.accountid=CHANGEME
+      - homepage.widget.tunnelid=CHANGEME
+      - homepage.widget.key=CHANGEME
