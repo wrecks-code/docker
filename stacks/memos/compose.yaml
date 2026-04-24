@@ -1,0 +1,37 @@
+services:
+  memos:
+    image: neosmemo/memos:stable
+    container_name: memos
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - traefik-net
+    volumes:
+      - /opt/docker/appdata/memos/config:/var/opt/memos
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      # Backend Definition
+      - traefik.http.services.memos.loadbalancer.server.port=5230
+      # 1. Router für Lokales Netz (websecure + TLS)
+      - traefik.http.routers.memos-local.rule=Host(`${MEMOS_HOST}`)
+      - traefik.http.routers.memos-local.entrypoints=websecure
+      - traefik.http.routers.memos-local.tls=true
+      - traefik.http.routers.memos-local.service=memos
+      # 2. Router für Cloudflare Tunnel (web / Port 80 Entrypoint)
+      - traefik.http.routers.memos-cf.rule=Host(`${MEMOS_CF_HOST}`)
+      - traefik.http.routers.memos-cf.entrypoints=web
+      - traefik.http.routers.memos-cf.priority=10
+      - traefik.http.routers.memos-cf.service=memos
+
+      - homepage.group=Services
+      - homepage.name=Memos
+      - homepage.icon=memos
+      - homepage.href=https://${MEMOS_CF_HOST}
+      - homepage.description=Note-taking service
+      - homepage.siteMonitor=https://${MEMOS_CF_HOST}
+
+networks:
+  traefik-net:
+    external: true

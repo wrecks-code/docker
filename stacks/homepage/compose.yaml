@@ -1,0 +1,26 @@
+networks:
+  servarr-net:
+    external: true
+  traefik-net:
+    external: true
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - traefik-net
+      - servarr-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /mnt/usb-hdd:/mnt/usb-hdd:ro
+      - /opt/docker/appdata/homepage:/app/config
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.homepage.rule=Host(`${HOMEPAGE_ALLOWED_HOSTS}`)
+      - traefik.http.routers.homepage.entrypoints=websecure
+      - traefik.http.routers.homepage.tls=true
+      - traefik.http.services.homepage.loadbalancer.server.port=3000

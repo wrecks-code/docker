@@ -1,0 +1,62 @@
+networks:
+  notes-net:
+    name: notes-net
+    driver: bridge
+services:
+  joplin-db:
+    image: postgres:15
+    container_name: joplin-db
+    restart: unless-stopped
+    networks:
+      - notes-net
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${JOPLIN_DB}
+      - POSTGRES_USER=${JOPLIN_DB_USER}
+      - POSTGRES_PASSWORD=${JOPLIN_DB_PASS}
+    volumes:
+      - /usb-ssd/docker/appdata/joplin/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 30s
+      timeout: 5s
+      retries: 5
+  joplin:
+    image: joplin/server:latest
+    container_name: joplin
+    restart: unless-stopped
+    depends_on:
+      joplin-db:
+        condition: service_healthy
+    networks:
+      - notes-net
+    env_file:
+      - .env
+    environment:
+      - APP_PORT=22300
+      - APP_BASE_URL=http://${JOPLIN_HOST}
+      - DB_CLIENT=pg
+      - POSTGRES_PASSWORD=${JOPLIN_DB_PASS}
+      - POSTGRES_DATABASE=${JOPLIN_DB}
+      - POSTGRES_USER=${JOPLIN_DB_USER}
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=joplin-db
+      - MAILER_ENABLED=${JOPLIN_MAILER_ENABLED:-0}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=notes-net
+      # LAN HTTPS
+      - traefik.http.routers.joplin.rule=Host(`${JOPLIN_HOST}`)
+      - traefik.http.routers.joplin.entrypoints=websecure
+      - traefik.http.services.joplin.loadbalancer.server.port=22300
+      # LAN HTTP (no redirect)
+      - traefik.http.routers.joplin-http.rule=Host(`${JOPLIN_HOST}`)
+      - traefik.http.routers.joplin-http.entrypoints=web
+      - traefik.http.routers.joplin-http.service=joplin
+      # CF tunnel hits Traefik:80 (optional)
+      - traefik.http.routers.joplin-cf.rule=Host(`${JOPLIN_CF_HOST}`)
+      - traefik.http.routers.joplin-cf.entrypoints=web
+      - traefik.http.routers.joplin-cf.service=joplin

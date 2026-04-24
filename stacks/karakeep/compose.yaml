@@ -1,0 +1,67 @@
+services:
+  web:
+    image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION}
+    container_name: karakeep-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MEILI_ADDR: http://meilisearch:7700
+      BROWSER_WEB_URL: http://chrome:9222
+      DATA_DIR: /data
+    volumes:
+      - /opt/docker/appdata/karakeep/karakeep-web/data:/data
+    networks:
+      - traefik-net
+      - karakeep-net
+      - ollama-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.karakeep.rule=Host(`${KARAKEEP_HOST}`)
+      - traefik.http.routers.karakeep.entrypoints=web,websecure
+      - traefik.http.services.karakeep.loadbalancer.server.port=3000
+      - homepage.group=${GRP_DOCS}
+      - homepage.name=Karakeep
+      - homepage.icon=karakeep
+      - homepage.href=https://${KARAKEEP_HOST}
+      - homepage.siteMonitor=https://${KARAKEEP_HOST}
+      - homepage.description=A self-hostable bookmark-everything app (links, notes and images) with AI-based automatic tagging and full text search
+      - homepage.widget.type=karakeep
+      - homepage.widget.url=http://web:3000
+      - homepage.widget.key=${KARAKEEP_API_KEY}
+
+  chrome:
+    image: gcr.io/zenika-hub/alpine-chrome:124
+    container_name: karakeep-chrome
+    restart: unless-stopped
+    command:
+      - --no-sandbox
+      - --disable-gpu
+      - --disable-dev-shm-usage
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - --hide-scrollbars
+    networks:
+      - karakeep-net
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.13.3
+    container_name: karakeep-meilisearch
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - /opt/docker/appdata/karakeep/karakeep-meilisearch/meili_data:/meili_data
+    networks:
+      - karakeep-net
+
+networks:
+  traefik-net:
+    external: true
+  karakeep-net:
+    external: true
+  ollama-net:
+    external: true

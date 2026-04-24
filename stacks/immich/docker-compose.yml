@@ -1,0 +1,104 @@
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: immich-server
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - immich-net
+      - traefik-net
+    depends_on:
+      - redis
+      - database
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:2283/api/server/ping
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.services.immich.loadbalancer.server.port=2283
+      - traefik.http.routers.immich.rule=Host(`${IMMICH_TRAEFIK_HOST}`)
+      - traefik.http.routers.immich.entrypoints=websecure
+      - traefik.http.routers.immich-cf.rule=Host(`${IMMICH_CF_HOST}`)
+      - traefik.http.routers.immich-cf.entrypoints=web
+      - traefik.http.routers.immich-http.rule=Host(`${IMMICH_TRAEFIK_HOST}`)
+      - traefik.http.routers.immich-http.entrypoints=web
+
+      - homepage.group=${GRP_PERS}
+      - homepage.name=Immich
+      - homepage.icon=immich
+      - homepage.href=https://${IMMICH_TRAEFIK_HOST}
+      - homepage.description=High performance self-hosted photo and video management solution
+      - homepage.siteMonitor=https://${IMMICH_TRAEFIK_HOST}
+      - homepage.widget.type=immich
+      - homepage.widget.url=http://immich-server:2283
+      - homepage.widget.key=${IMMICH_KEY}
+      - homepage.widget.version=2
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: immich-ml
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - immich-net
+    volumes:
+      - ${ML_CACHE_LOCATION}:/cache
+    devices:
+      - /dev/dri:/dev/dri
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      disable: false
+    labels:
+      - traefik.enable=false
+  redis:
+    image: docker.io/valkey/valkey:9@sha256:fb8d272e529ea567b9bf1302245796f21a2672b8368ca3fcb938ac334e613c8f
+    container_name: immich-redis
+    restart: unless-stopped
+    networks:
+      - immich-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping || exit 1
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=false
+  database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    container_name: immich-postgres
+    restart: unless-stopped
+    networks:
+      - immich-net
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    labels:
+      - traefik.enable=false
+networks:
+  immich-net:
+    external: true
+  traefik-net:
+    external: true

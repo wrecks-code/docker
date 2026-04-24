@@ -1,0 +1,46 @@
+networks:
+  traefik-net:
+    external: true
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - traefik-net
+    volumes:
+      - /opt/docker/appdata/vaultwarden:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:80/
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      # Definition des Backends (Port 80 im Container)
+      - traefik.http.services.vw.loadbalancer.server.port=80
+      # 1. Router für Lokales Netz (home.lan)
+      - traefik.http.routers.vw-local.rule=Host(`${VW_HOST}`)
+      - traefik.http.routers.vw-local.entrypoints=websecure
+      - traefik.http.routers.vw-local.tls=true
+      - traefik.http.routers.vw-local.service=vw
+      # 2. Router für Cloudflare (speedpoop.com)
+      # Wir nutzen hier 'web' (Port 80) wie bei deinem hass-cf Setup
+      - traefik.http.routers.vw-cf.rule=Host(`${VW_CF_HOST}`)
+      - traefik.http.routers.vw-cf.entrypoints=web
+      - traefik.http.routers.vw-cf.priority=10
+      - traefik.http.routers.vw-cf.service=vw
+  
+      - homepage.group=${GRP_PERS}
+      - homepage.name=Vaultwarden
+      - homepage.icon=sh-vaultwarden-light
+      - homepage.href=https://${VW_HOST}
+      - homepage.description=Unofficial Bitwarden compatible server written in Rust, formerly known as bitwarden_rs 
+      - homepage.siteMonitor=https://${VW_CF_HOST}

@@ -1,0 +1,35 @@
+networks:
+  mgmt-net:
+    external: true
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    user: 1000:1000
+    environment:
+      TZ: Europe/Berlin
+    networks:
+      - mgmt-net
+    volumes:
+      - /usb-ssd/docker/appdata/filebrowser/db:/database
+      - /usb-ssd/docker/appdata/filebrowser/config:/config
+      # Set what you want to manage as the root:
+      - /usb-ssd/docker:/srv
+      # e.g., only your media:
+      # - /usb-ssd/media:/srv
+    command:
+      - --database
+      - /database/filebrowser.db
+      - --config
+      - /config/settings.json
+      - --root
+      - /srv
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.filebrowser.rule=Host(`filebrowser.home.lan`)
+      - traefik.http.routers.filebrowser.entrypoints=websecure
+      - traefik.http.routers.filebrowser.tls=true
+      # If you don't use wildcard certs, set your resolver:
+      # - traefik.http.routers.filebrowser.tls.certresolver=myresolver
+      - traefik.http.services.filebrowser.loadbalancer.server.port=80

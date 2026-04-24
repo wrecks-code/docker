@@ -1,0 +1,28 @@
+services:
+  flatnotes:
+    image: dullage/flatnotes:latest
+    container_name: flatnotes
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+      - PUID=1000
+      - PGID=1000
+      - FLATNOTES_AUTH_TYPE=password
+      - FLATNOTES_USERNAME=${FLATNOTES_USERNAME}
+      - FLATNOTES_PASSWORD=${FLATNOTES_PASSWORD}
+      - FLATNOTES_SECRET_KEY=${FLATNOTES_SECRET_KEY}
+    volumes:
+      - /opt/docker/appdata/flatnotes/data:/data
+      # Optional: separate search index location
+      # - /usb-ssd/docker/appdata/flatnotes/index:/data/.flatnotes
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.flatnotes.rule=Host(`${FLATNOTES_HOST}`)
+      - traefik.http.routers.flatnotes.entrypoints=websecure
+      - traefik.http.routers.flatnotes.tls.certresolver=cfresolver
+      - traefik.http.services.flatnotes.loadbalancer.server.port=8080
+    networks:
+      - traefik-net
+networks:
+  traefik-net:
+    external: true
