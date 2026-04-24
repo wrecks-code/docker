@@ -1,0 +1,402 @@
+networks:
+  servarr-net:
+    external: true
+  comics-net:
+    external: true
+  traefik-net:
+    external: true
+services:
+  # ----------------------------------------
+  # CORE SERVICES (Start these first)
+  # ----------------------------------------
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - traefik-net
+    volumes:
+      - /opt/docker/appdata/sabnzbd:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8080
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s # Give RPi time to chew through boot
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.sab.rule=Host(`${SABNZBD_HOST}`)
+      - traefik.http.routers.sab.entrypoints=websecure
+      - traefik.http.services.sab.loadbalancer.server.port=8080
+
+      
+      - homepage.group=${GRP_ENT}
+      - homepage.name=SABnzbd
+      - homepage.icon=sabnzbd
+      - homepage.href=https://${SABNZBD_HOST}
+      - homepage.description=Usenet Downloader
+      - homepage.siteMonitor=https://${SABNZBD_HOST}
+      - homepage.widget.type=sabnzbd
+      - homepage.widget.url=http://sabnzbd:8080
+      - homepage.widget.key=${SABNZBD_API_KEY}
+  prowlarr:
+    image: ghcr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - comics-net
+      - traefik-net
+    volumes:
+      - /opt/docker/appdata/prowlarr:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:9696/ping
+        # Ping is faster/lighter than loading UI
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.prowlarr.rule=Host(`${PROWLARR_HOST}`)
+      - traefik.http.routers.prowlarr.entrypoints=websecure
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Prowlarr
+      - homepage.icon=prowlarr
+      - homepage.href=https://${PROWLARR_HOST}
+      - homepage.description=Indexer Manager
+      - homepage.siteMonitor=https://${PROWLARR_HOST}
+      - homepage.widget.type=prowlarr
+      - homepage.widget.url=http://prowlarr:9696
+      - homepage.widget.key=${PROWLARR_API_KEY}
+  # ----------------------------------------
+  # DEPENDENT APPS (Wait for Core)
+  # ----------------------------------------
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - traefik-net
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/radarr:/config
+      - /mnt/usb-hdd/docker/data:/data
+      - /opt/docker/appdata/radarr/custom-services.d:/custom-services.d
+      - /opt/docker/appdata/radarr/custom-cont-init.d:/custom-cont-init.d
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:7878/ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.radarr.rule=Host(`${RADARR_HOST}`)
+      - traefik.http.routers.radarr.entrypoints=websecure
+      - traefik.http.services.radarr.loadbalancer.server.port=7878
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Radarr
+      - homepage.icon=radarr
+      - homepage.href=https://${RADARR_HOST}
+      - homepage.description=Movie organizer/manager for usenet and torrent users
+      - homepage.siteMonitor=https://${RADARR_HOST}
+      - homepage.widget.type=radarr
+      - homepage.widget.url=http://radarr:7878
+      - homepage.widget.key=${RADARR_API_KEY}
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - traefik-net
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/sonarr:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8989/ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.sonarr.rule=Host(`${SONARR_HOST}`)
+      - traefik.http.routers.sonarr.entrypoints=websecure
+      - traefik.http.services.sonarr.loadbalancer.server.port=8989
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Sonarr
+      - homepage.icon=sonarr
+      - homepage.href=https://${SONARR_HOST}
+      - homepage.description=Smart PVR for newsgroup and bittorrent users
+      - homepage.siteMonitor=https://${SONARR_HOST}
+      - homepage.widget.type=sonarr
+      - homepage.widget.url=http://sonarr:8989
+      - homepage.widget.key=${SONARR_API_KEY}
+
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      UMASK: "002"
+      TZ: Europe/Berlin
+    networks:
+      - servarr-net
+      - traefik-net
+    depends_on:
+      sabnzbd:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/lidarr/config:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8686/ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.lidarr.rule=Host(`${LIDARR_HOST}`)
+      - traefik.http.routers.lidarr.entrypoints=websecure
+      - traefik.http.services.lidarr.loadbalancer.server.port=8686
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Lidarr
+      - homepage.icon=lidarr
+      - homepage.href=https://${LIDARR_HOST}
+      - homepage.description=Looks and smells like Sonarr but made for music
+      - homepage.siteMonitor=https://${LIDARR_HOST}
+      - homepage.widget.type=lidarr
+      - homepage.widget.url=http://lidarr:8686
+      - homepage.widget.key=${LIDARR_API_KEY}
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - traefik-net
+    depends_on:
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/bazarr:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:6767/ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.bazarr.rule=Host(`${BAZARR_HOST}`)
+      - traefik.http.routers.bazarr.entrypoints=websecure
+      - traefik.http.services.bazarr.loadbalancer.server.port=6767
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Bazarr
+      - homepage.icon=bazarr
+      - homepage.href=https://${BAZARR_HOST}
+      - homepage.description=Subtitle Indexer
+      - homepage.siteMonitor=https://${BAZARR_HOST}
+      - homepage.widget.type=bazarr
+      - homepage.widget.url=http://bazarr:6767
+      - homepage.widget.key=${BAZARR_API_KEY}
+      
+  # ----------------------------------------
+  # MANAGEMENT/UTILITY (Must wait for *Arrs)
+  # ----------------------------------------
+  umlautadaptarr:
+    image: pcjones/umlautadaptarr:latest
+    container_name: umlautadaptarr
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Berlin
+      SONARR__ENABLED: "true"
+      SONARR__HOST: http://sonarr:8989
+      SONARR__APIKEY: ${SONARR_API_KEY}
+      RADARR__ENABLED: "true"
+      RADARR__HOST: http://radarr:7878
+      RADARR__APIKEY: ${RADARR_API_KEY}
+    networks:
+      - servarr-net
+    depends_on:
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+    labels:
+      - traefik.enable=false
+      - com.centurylinklabs.watchtower.enable=false
+
+      - homepage.group=${GRP_ENT}
+      - homepage.name=UmlautAdaptarr
+      - homepage.icon=mdi-alphabetical-variant
+      - homepage.description=A tool to work around Sonarr, Radarr, Lidarr and Readarrs problems with foreign languages
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    env_file: .env
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/dri/card0:/dev/dri/card0
+    group_add:
+      - "993" #  ID 'render' 
+      - "44" #  ID 'video'
+    networks:
+      - servarr-net
+      - traefik-net
+    volumes:
+      # Config und Cache sauber getrennt
+      - /opt/docker/appdata/jellyfin/config:/config
+      - /opt/docker/appdata/jellyfin/cache:/cache
+      # Das Haupt-Datenverzeichnis (Mapping auf /media)
+      # In Jellyfin fügst du Libraries dann via /media/movies etc. hinzu
+      - /mnt/usb-hdd/docker/data:/media
+      # Web-Mod (Falls du das wirklich brauchst - Pfad muss exakt stimmen!)
+      # - /opt/docker/appdata/jellyfin/config/index.html:/jellyfin/jellyfin-web/index.html:ro
+      # Fonts
+      - /opt/docker/appdata/jellyfin/fonts:/usr/local/share/fonts/custom:ro
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8096/health
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_HOST}`)
+      - traefik.http.routers.jellyfin.entrypoints=websecure
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+      - traefik.http.routers.jellyfin-http.rule=Host(`${JELLYFIN_HOST}`)
+      - traefik.http.routers.jellyfin-http.entrypoints=web
+      - traefik.http.routers.jellyfin-http.priority=10
+      - traefik.http.routers.jellyfin-http.service=jellyfin
+      - traefik.http.routers.jellyfin-cf.rule=Host(`${JELLYFIN_CF_HOST}`)
+      - traefik.http.routers.jellyfin-cf.entrypoints=web
+      - traefik.http.routers.jellyfin-cf.priority=10
+      - traefik.http.routers.jellyfin-cf.service=jellyfin
+
+      - homepage.weight=0
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Jellyfin
+      - homepage.icon=jellyfin
+      - homepage.href=https://${JELLYFIN_HOST}
+      - homepage.description=The Free Software Media System - Server Backend & API
+      - homepage.siteMonitor=https://${JELLYFIN_HOST}
+      - homepage.widget.type=jellyfin
+      - homepage.widget.url=http://jellyfin:8096
+      - homepage.widget.key=${JELLYFIN_API_KEY}
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - servarr-net
+      - traefik-net
+    depends_on:
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      jellyfin:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/jellyseerr:/app/config
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider
+          http://localhost:5055/api/v1/status || exit 1
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.jellyseerr.rule=Host(`${JELLYSEERR_HOST}`)
+      - traefik.http.routers.jellyseerr.entrypoints=websecure
+      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055
+
+      - homepage.weight=1
+      - homepage.group=${GRP_ENT}
+      - homepage.name=Jellyseerr
+      - homepage.icon=jellyseerr
+      - homepage.href=https://${JELLYSEERR_HOST}
+      - homepage.description=Open-source media request and discovery manager for Jellyfin, Plex, and Emby
+      - homepage.siteMonitor=https://${JELLYSEERR_HOST}
+      - homepage.widget.type=jellyseerr
+      - homepage.widget.url=http://jellyseerr:5055
+      - homepage.widget.key=${JELLYSEERR_API_KEY}

@@ -1,0 +1,28 @@
+services:
+  castsponsorskip:
+    image: ghcr.io/gabe565/castsponsorskip:latest
+    container_name: castsponsorskip
+    restart: unless-stopped
+    network_mode: host # Pflicht für Discovery/Control
+    user: 1000:1000
+    environment:
+      - TZ=Europe/Berlin
+      # Optional-Tweaks (bei Bedarf in stack.env setzen):
+      # - CSS_YOUTUBE_API_KEY=${CSS_YOUTUBE_API_KEY}   # Fallback-Erkennung auf älteren Chromecasts
+      # - CSS_CATEGORIES=${CSS_CATEGORIES}             # z.B. sponsor,selfpromo,interaction
+      # - CSS_MUTE_ADS=${CSS_MUTE_ADS:-true}
+      # Kein Port/Volume nötig
+    healthcheck:
+      # Prüft, dass der Hauptprozess läuft (ohne busybox/pgrep-Abhängigkeit)
+      test:
+        - CMD-SHELL
+        - '[ "$(cat /proc/1/comm)" = "castsponsorskip" ] || exit 1'
+      interval: 30s
+      timeout: 3s
+      retries: 5
+    labels:
+      - homepage.group=${GRP_ENT}
+      - homepage.name=CastSponsorSkip
+      - homepage.icon=https://raw.githubusercontent.com/gabe565/CastSponsorSkip/9606e050d050887c15a2d01a9a772c9356fdf8d8/assets/icon.svg
+      - homepage.description=Skip YouTube sponsorships (and sometimes ads) on all local Google Cast devices
+networks: {}

@@ -1,0 +1,27 @@
+services:
+  configarr:
+      image: ghcr.io/raydak-labs/configarr:latest
+      container_name: configarr
+      restart: no
+      env_file:
+        - .env
+      environment:
+        - TZ=Europe/Berlin
+      networks:
+        - servarr-net
+      volumes:
+        - /opt/docker/appdata/configarr/config:/app/config
+        - /opt/docker/appdata/configarr/repos:/app/repos
+        - /opt/docker/appdata/configarr/cfs:/app/cfs
+        - /opt/docker/appdata/configarr/templates:/app/templates
+      labels:
+        - traefik.enable=false
+
+        - homepage.group=${GRP_ENT}
+        - homepage.name=Configarr
+        - homepage.icon=https://configarr.de/img/logo.svg
+        - homepage.description=Sync TRaSH Guides + custom configs with Sonarr/Radarr 
+
+networks:
+  servarr-net:
+    external: true

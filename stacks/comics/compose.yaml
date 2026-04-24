@@ -1,0 +1,147 @@
+networks:
+  comics-net:
+    external: true
+  traefik-net:
+    external: true
+services:
+  komga:
+    image: gotson/komga:latest
+    container_name: komga
+    restart: unless-stopped
+    #user: 1000:1000
+    networks:
+      - comics-net
+      - traefik-net
+    env_file:
+      - .env
+      #environment:
+      #- JAVA_TOOL_OPTIONS=-Xmx1200m
+    volumes:
+      - /opt/docker/appdata/komga/config:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:25600/actuator/health
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.komga.rule=Host(`${KOMGA_HOST}`)
+      - traefik.http.routers.komga.entrypoints=web,websecure
+      - traefik.http.services.komga.loadbalancer.server.port=25600
+
+      - homepage.group=${GRP_LIB}
+      - homepage.name=Komga
+      - homepage.icon=komga
+      - homepage.href=https://${KOMGA_HOST}
+      - homepage.description=Media server for comics/mangas/BDs/magazines/eBooks with API, OPDS, Kobo Sync and KOReader Sync support
+      - homepage.siteMonitor=https://${KOMGA_HOST}
+      - homepage.widget.type=komga
+      - homepage.widget.url=http://komga:25600
+      - homepage.widget.key=${KOMGA_KEY}
+      - homepage.widget.version=2
+
+  kapowarr:
+    image: mrcas/kapowarr:latest
+    container_name: kapowarr
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - comics-net
+      - traefik-net
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/kapowarr/app/db:/app/db
+      - /mnt/usb-hdd/docker/data:/data
+      #- /opt/docker/appdata/kapowarr/download_folder:/download_folder
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import socket;
+          socket.create_connection(('localhost',5656),2)"
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.kapowarr.rule=Host(`${KAPOWARR_HOST}`)
+      - traefik.http.routers.kapowarr.entrypoints=websecure
+      - traefik.http.services.kapowarr.loadbalancer.server.port=5656
+
+      - homepage.group=${GRP_LIB}
+      - homepage.name=Kapowarr
+      - homepage.icon=kapowarr
+      - homepage.href=https://${KAPOWARR_HOST}
+      - homepage.description=Comic Book Scraper
+      - homepage.siteMonitor=https://${KAPOWARR_HOST}
+  komf:
+    image: sndxr/komf:latest
+    container_name: komf
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - comics-net
+      - traefik-net
+    depends_on:
+      komga:
+        condition: service_healthy
+    volumes:
+      - /opt/docker/appdata/komf/config:/config
+      - /mnt/usb-hdd/docker/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8085
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.komf.rule=Host(`${KOMF_HOST}`)
+      - traefik.http.routers.komf.entrypoints=web,websecure
+      - traefik.http.services.komf.loadbalancer.server.port=8085
+
+      - homepage.group=${GRP_LIB}
+      - homepage.name=Komf
+      - homepage.icon=mdi-book-open-variant
+      - homepage.href=https://${KOMF_HOST}
+      - homepage.description=Komga and Kavita metadata fetcher
+      - homepage.siteMonitor=https://${KOMF_HOST}
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - comics-net
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8191/health
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=false
+      
+      - homepage.group=${HP_GROUP_MEDIA}
+      - homepage.name=FlareSolverr
+      - homepage.icon=https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/flaresolverr.svg
+      - homepage.description=Proxy server to bypass Cloudflare protection

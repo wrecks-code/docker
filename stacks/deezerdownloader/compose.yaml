@@ -1,0 +1,27 @@
+services:
+  deezerdownloader:
+    image: kmille2/deezer-downloader:latest
+    container_name: deezer-downloader
+    restart: unless-stopped
+    environment:
+      DEEZER_COOKIE_ARL: ${DEEZER_COOKIE_ARL}
+    volumes:
+      - /mnt/usb-hdd/docker/data/music:/mnt/deezer-downloader
+    networks:
+      - traefik-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.deezerdownloader.rule=Host(`${DEEZERDOWNLOADER_HOST}`)
+      - traefik.http.routers.deezerdownloader.entrypoints=web,websecure
+      - traefik.http.services.deezerdownloader.loadbalancer.server.port=5000
+      - homepage.group=Media
+      - homepage.name=Deezer Downloader
+      - homepage.icon=deezer
+      - homepage.href=https://${DEEZERDOWNLOADER_HOST}
+      - homepage.siteMonitor=https://${DEEZERDOWNLOADER_HOST}
+      - homepage.description=Download music from Deezer and Spotify with a simple web frontend, through a local-hosted service written in Python
+
+networks:
+  traefik-net:
+    external: true
